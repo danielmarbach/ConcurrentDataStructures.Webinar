@@ -1,0 +1,459 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Concurrent data structures with examples in Azure Service Bus</title>
+    <meta name="description" content="Concurrent data structures with examples in Azure Service Bus">
+    <meta name="author" content="Daniel Marbach">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="//code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="//code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/night.css" id="theme">
+    <link type="text/css" rel="stylesheet" href="fsharp.formatting/styles/style.css" />
+    <link type="text/css" rel="stylesheet" href="fsharp.formatting/styles/deedle.css" />
+    <link type="text/css" rel="stylesheet" href="css/custom.css" />
+    <script src="fsharp.formatting/styles/tips.js" type="text/javascript"></script>
+    <!-- For syntax highlighting -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+    <link rel="stylesheet" href="css/fsreveal.css">
+    <!-- If the query includes 'print-pdf', include the PDF print sheet -->
+    <script>
+			if( window.location.search.match( /print-pdf/gi ) ) {
+				var link = document.createElement( 'link' );
+				link.rel = 'stylesheet';
+				link.type = 'text/css';
+				link.href = 'css/print/pdf.css';
+				document.getElementsByTagName( 'head' )[0].appendChild( link );
+			}
+    </script>
+    <!--[if lt IE 9]>
+    <script src="lib/js/html5shiv.js"></script>
+    <![endif]-->
+    <script language="javascript" type="text/javascript">
+        function init()
+        {
+            websocket = new WebSocket("ws://"+window.location.host+"/websocket");
+            websocket.onmessage = function(evt) { location.reload(); };
+        }
+        window.addEventListener("load", init, false);
+    </script>
+</head>
+<body>
+    <div class="reveal">
+        
+        <!-- Any section element inside of this container is displayed as a slide -->
+        <div class="slides">
+            <section >
+<section >
+<h3>Introduction</h3>
+<ul>
+<li>The examples in this presentation use the <a href="https://www.nuget.org/packages/WindowsAzure.ServiceBus/">WindowsAzure.ServiceBus</a> approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use <a href="https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/">Microsoft.Azure.ServiceBus</a> or even better <a href="https://www.nuget.org/packages/Azure.Messaging.ServiceBus">Azure.Messaging.ServiceBus</a></li>
+</ul>
+</section>
+<section >
+<h3>Why am I telling you this?</h3>
+<p><img src="images/copy-paste.jpg" alt="Copy Paste" /></p>
+<blockquote>
+<p><strong>Stackoverflow Law</strong>: Good coders borrow, great coders steal. <a href="https://stackoverflow.blog/2020/05/20/good-coders-borrow-great-coders-steal/">The Internet</a></p>
+</blockquote>
+</section>
+</section>
+<section >
+<section >
+<h3>Receive/Complete messages</h3>
+<ul>
+<li>MessagingFactory = Dedicated TCP connection --&gt; faaast!</li>
+<li>Every <code>CompleteAsync</code> is a dedicated call to the cloud --&gt; slooow!</li>
+</ul>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> factory<span class="n">1</span> <span class="o">=</span> await MessagingFactory.CreateAsync(address, settings);
+<span class="k">var</span> factory<span class="n">2</span> <span class="o">=</span> await MessagingFactory.CreateAsync(address, settings;
+<span class="k">var</span> receiver<span class="n">1</span> <span class="o">=</span> await factory<span class="n">1</span>.CreateMessageReceiverAsync(queueName, ReceiveMode.PeekLock);
+<span class="k">var</span> receiver<span class="n">2</span> <span class="o">=</span> await factory<span class="n">2</span>.CreateMessageReceiverAsync(queueName, ReceiveMode.PeekLock);
+
+receiver<span class="n">1</span>.OnMessageAsync(msg <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(msg, receiver<span class="n">1</span>), <span class="o">.</span><span class="o">.</span>);
+receiver<span class="n">2</span>.OnMessageAsync(msg <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(msg, receiver<span class="n">2</span>), <span class="o">.</span><span class="o">.</span>);
+
+<span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message, MessageReceiver receiver) {
+    <span class="c">// process message</span>
+    await receiver.CompleteAsync(message.LockToken)
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>Can we do better?</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> lockTokensToComplete <span class="o">=</span> <span class="k">new</span> ConcurrentStack&lt;Guid&gt;();
+
+<span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message) {
+    <span class="c">// process message</span>
+    lockTokensToComplete.Push(message.LockToken);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>We need someonen to complete the tokens</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> tokenSource <span class="o">=</span> <span class="k">new</span> CancellationTokenSource();
+<span class="k">var</span> token <span class="o">=</span> tokenSource.Token;
+
+<span class="k">var</span> batchCompletionTask <span class="o">=</span> Task.Run(<span class="k">async</span> () <span class="o">=</span><span class="o">&gt;</span> {
+    <span class="k">while</span>(!token.IsCancellationRequested) {
+        <span class="k">var</span> lockTokens <span class="o">=</span> <span class="k">new</span> Guid[<span class="n">100</span>];
+        <span class="k">int</span> numberOfItems <span class="o">=</span> lockTokensToComplete.TryPopRange(lockTokens)
+        <span class="k">if</span>(numberOfItems <span class="o">&gt;</span> <span class="n">0</span>) {
+            await receiveClient.CompleteBatchAsync(lockTokens);
+        }
+        await Task.Delay(TimeSpan.FromSeconds(<span class="n">5</span>), token);
+    }
+});
+</code></pre></td></tr></table>
+<aside class="notes">
+Under small load, we complete lock tokens in in batches of one to maximum one hundred tokens. <br/>
+If we receive only a limited number of messages, the loop might complete messages with their tokens one by one (for example when we receive a message every 6 seconds). But what happens when the load increases?<br/>
+When we’d received several hundred messages per seconds our randomly chosen “complete every one-hundredth messages” and then “sleep for five seconds” might turn out to be a suboptimal choice<br/>
+https://www.planetgeek.ch/2016/12/05/another-attempt-to-batch-complete-with-azure-service-bus/<br/>
+</aside>
+</section>
+<section >
+<h3>Under concurrency, things might spin</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message) {
+    <span class="c">// process message</span>
+    lockTokensToComplete.Push(message.LockToken);
+}
+</code></pre></td></tr></table>
+<ul>
+<li><code>NumberOfReceivers</code> * <code>ConcurrencyPerReceiver</code> will push to the concurrent stack</li>
+</ul>
+<aside class="notes">
+So for example when we’d use 10 receivers with each a concurrency setting of 32 we’d be ending up pushing lock tokens to the concurrent stack from up to 320 simultaneous operations    <br/>
+</aside>
+</section>
+<section >
+<blockquote>
+<p><strong>Are all of the new concurrent collections lock-free?</strong>: ConcurrentQueue<T> and ConcurrentStack<T> are completely lock-free in this way. They will never take a lock, but they may end up spinning and retrying an operation when faced with contention <a href="https://blogs.msdn.microsoft.com/pfxteam/2010/01/26/faq-are-all-of-the-new-concurrent-collections-lock-free/">Old Post</a></p>
+</blockquote>
+<aside class="notes">
+Of course the concurrent data structures are getting improved, still spinning and retrying is something that has to taken into account<br/>
+</aside>
+</section>
+<section >
+<h3>Under load we might not keep up</h3>
+<ul>
+<li>Concurrent receivers can fill the concurrent stack faster with lock tokens than our completion loop manage to complete</li>
+<li>Increased change of lock lost problems under peek lock</li>
+</ul>
+</section>
+<section >
+<h3>Let's fix that</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> completionTasks <span class="o">=</span> <span class="k">new</span> Task[numberOfReceivers];
+
+<span class="k">for</span>(<span class="k">int</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfReceivers; i+<span class="o">+</span>) { 
+    completionTasks[i] <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> BatchCompletionLoop());
+}
+
+<span class="k">static</span> <span class="k">async</span> Task BatchCompletionLoop() {
+    <span class="k">while</span>(!token.IsCancellationRequested) {
+        <span class="k">var</span> lockTokens <span class="o">=</span> <span class="k">new</span> Guid[<span class="n">100</span>];
+        <span class="k">int</span> numberOfItems <span class="o">=</span> lockTokensToComplete.TryPopRange(lockTokens)
+        <span class="k">if</span>(numberOfItems <span class="o">&gt;</span> <span class="n">0</span>) {
+            await receiveClient.CompleteBatchAsync(lockTokens);
+        }
+        await Task.Delay(TimeSpan.FromSeconds(<span class="n">5</span>), token);
+    }
+}
+</code></pre></td></tr></table>
+<ul>
+<li>Contention problem is even worse, multiple background completion operations are competing on the concurrent stack</li>
+<li>Same <code>Task.Delay</code> without jitter causes a lot to wake up and potentially not succed, wasting a lot of resources</li>
+</ul>
+<aside class="notes">
+Even if we had jitter latency might make loops align again over time<br/>
+https://www.planetgeek.ch/2016/12/14/batch-completion-with-multiple-receivers-on-azure-service-bus/<br/>
+</aside>
+</section>
+<section >
+<h3>There is a dragon hiding here</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs">await receiveClient.CompleteBatchAsync(lockTokens);
+</code></pre></td></tr></table>
+<ul>
+<li>Complete always on the same receiver</li>
+<li>Works with SBMP (NetMessaging) but fails with AMQP as a transport type</li>
+</ul>
+</section>
+<section >
+<h3>Surely we can fix that too?</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> lockTokensToComplete <span class="o">=</span> <span class="k">new</span> ConcurrentStack&lt;Guid&gt;[numberOfReceivers];
+<span class="c">// initialize the concurrent stacks</span>
+
+receiveClient<span class="n">1</span>.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, lockTokensToComplete[<span class="n">0</span>]);
+<span class="o">.</span><span class="o">.</span><span class="o">.</span>
+receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, lockTokensToComplete[N<span class="n">-1</span>]);
+
+<span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message, ConcurrentStack&lt;Guid&gt; lockTokensToComplete) {
+    <span class="c">// process message</span>
+    lockTokensToComplete.Push(message.LockToken);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>... and the completion</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">for</span>(<span class="k">int</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfReceivers; i+<span class="o">+</span>) { 
+    completionTasks[i] <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
+}
+
+<span class="k">static</span> <span class="k">async</span> Task BatchCompletionLoop(MessageReceiver receiver, ConcurrentStack&lt;Guid&gt; lockTokensToComplete) {
+    <span class="k">while</span>(!token.IsCancellationRequested) {
+        <span class="k">var</span> lockTokens <span class="o">=</span> <span class="k">new</span> Guid[<span class="n">100</span>];
+        <span class="k">int</span> numberOfItems <span class="o">=</span> lockTokensToComplete.TryPopRange(lockTokens)
+        <span class="k">if</span>(numberOfItems <span class="o">&gt;</span> <span class="n">0</span>) {
+            await receiver.CompleteBatchAsync(lockTokens);
+        }
+        await Task.Delay(TimeSpan.FromSeconds(<span class="n">5</span>), token);
+    }
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>What have we achieved?</h3>
+<ul>
+<li>Contention is mostly gone</li>
+<li>
+Completion is guaranteed to use the same receiver to complete
+<br/>
+<br/>
+</li>
+</ul>
+<h3>but...</h3>
+</section>
+<section >
+<ul>
+<li>Still wasting a lot of resources due to the wakeup and idle pattern</li>
+<li>Code doesn't really have the necessary elasticity</li>
+</ul>
+</section>
+</section>
+<section >
+<section >
+<h3>Multi Producer Concurrent Consumer</h3>
+<ul>
+<li>Make sure messages are only completed on the receiver they came from</li>
+<li>Reduce the number of threads used when the number of clients is increased</li>
+<li>Autoscale up under heavy load</li>
+<li>Scale down under light load</li>
+<li>Minimise the contention on the underlying collections used</li>
+<li>Be completely asynchronous</li>
+<li>Implements a push based model from the producer and consumer perspective</li>
+<li>Respect the maximum batch sized defined by the client of the component or a predefined push interval</li>
+<li>Provide FIFO semantics instead of LIFO</li>
+<li>Be as lock-free as possible</li>
+</ul>
+</section>
+<section >
+<p><img src="images/mpcc.png" alt="Copy Paste" /></p>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">class</span> MultiProducerConcurrentConsumer&lt;TItem&gt; {
+    <span class="k">public</span> MultiProducerConcurrentConsumer(
+        <span class="k">int</span> batchSize, TimeSpan pushInterval, 
+        <span class="k">int</span> maxConcurrency, <span class="k">int</span> numberOfSlots) { }
+
+    <span class="k">public</span> <span class="k">void</span> Start(Func&lt;List&lt;TItem&gt;, <span class="k">int</span>, <span class="k">object</span>, CancellationToken, Task&gt; pump) { }
+
+    <span class="k">public</span> <span class="k">void</span> Start(Func&lt;List&lt;TItem&gt;, <span class="k">int</span>, <span class="k">object</span>, CancellationToken, Task&gt; pump, <span class="k">object</span> state) { }
+
+    <span class="k">public</span> <span class="k">void</span> Push(TItem item, <span class="k">int</span> slotNumber) { }
+
+    <span class="k">public</span> <span class="k">async</span> Task Complete(<span class="k">bool</span> drain <span class="o">=</span> <span class="k">true</span>) { }
+}
+</code></pre></td></tr></table>
+<aside class="notes">
+https://www.planetgeek.ch/2017/01/17/introduction-to-the-multiproducerconcurrentconsumer-for-azure-service-bus-message-completion/<br/>
+</aside>
+</section>
+<section >
+<h3>Pre-allocate and reuse</h3>
+<ul>
+<li>Allocate as much as you need upfront</li>
+<li>Allocate on-demand when you need it</li>
+</ul>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">public</span> MultiProducerConcurrentCompletion(<span class="k">int</span> batchSize, TimeSpan pushInterval, <span class="k">int</span> maxConcurrency, <span class="k">int</span> numberOfSlots) {   
+    queues <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;TItem&gt;[numberOfSlots];
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfSlots; i+<span class="o">+</span>)
+    {
+        queues[i] <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;TItem&gt;();
+    }
+    
+    <span class="k">var</span> maxNumberOfConcurrentOperationsPossible <span class="o">=</span> numberOfSlots <span class="o">*</span> maxConcurrency;
+    pushTasks <span class="o">=</span> <span class="k">new</span> List&lt;Task&gt;(maxNumberOfConcurrentOperationsPossible);
+
+    itemListBuffer <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span>();
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> maxNumberOfConcurrentOperationsPossible; i+<span class="o">+</span>)
+    {
+        itemListBuffer.Enqueue(<span class="k">new</span> List&lt;TItem&gt;(batchSize));
+    }
+}
+</code></pre></td></tr></table>
+<aside class="notes">
+The benefit of only allocating when needed is that the memory consumption only grows when it is needed. The downside of this approach is that under highly concurrent scenarios allocating structures in a safe and lock-free way can be tricky.<br/>
+https://www.planetgeek.ch/2017/01/19/multiproducerconcurrentconsumer-preallocate-and-reuse/<br/>
+</section>
+</section>
+
+
+        </div>
+    </div>
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+    <script>
+        // Add the nohighlight class and data-noescape attribute to code elements that have already been formatted by FSharp.Formatting
+        $('pre.highlighted code').addClass('nohighlight').attr('data-noescape', '');
+
+        // Full list of configuration options available here:
+        // https://github.com/hakimel/reveal.js#configuration
+        Reveal.initialize({
+            controls: true,
+            progress: true,
+            history: true,
+            center: true,
+
+            transition: 'default', // default/cube/page/concave/zoom/linear/fade/none
+
+            // Parallax scrolling
+            // parallaxBackgroundImage: 'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg',
+            // parallaxBackgroundSize: '2100px 900px',
+
+            // Optional libraries used to extend on reveal.js
+            dependencies: [
+                { src: 'lib/js/classList.js', condition: function () { return !document.body.classList; } },
+                { src: 'plugin/markdown/marked.js', condition: function () { return !!document.querySelector('[data-markdown]'); } },
+                { src: 'plugin/markdown/markdown.js', condition: function () { return !!document.querySelector('[data-markdown]'); } },
+                { src: 'plugin/highlight/highlight.js', async: true, callback: function () { hljs.initHighlightingOnLoad(); } },
+                { src: 'plugin/zoom-js/zoom.js', async: true, condition: function () { return !!document.body.classList; } },
+                { src: 'plugin/notes/notes.js', async: true, condition: function () { return !!document.body.classList; } }
+            ]
+        });
+
+    </script>
+</body>
+</html>
+
