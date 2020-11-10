@@ -350,3 +350,5 @@ MigrationBackup/
 .ionide/
 
 /connection.txt
+/output/**
+/.paket/**
