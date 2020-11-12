@@ -54,6 +54,8 @@
 <h3>Introduction</h3>
 <ul>
 <li>The examples in this presentation use the <a href="https://www.nuget.org/packages/WindowsAzure.ServiceBus/">WindowsAzure.ServiceBus</a> approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use <a href="https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/">Microsoft.Azure.ServiceBus</a> or even better <a href="https://www.nuget.org/packages/Azure.Messaging.ServiceBus">Azure.Messaging.ServiceBus</a></li>
+<li>For brevity and readability <code>ConfigureAwait(false)</code> has been left out and opionated braces placement has been used (You have been warned!)</li>
+<li>If you see spelling mistakes, I accept Pull Requests ;)</li>
 </ul>
 </section>
 <section >
@@ -255,17 +257,23 @@ https://www.planetgeek.ch/2016/12/14/batch-completion-with-multiple-receivers-on
 <span class="l"> 9: </span>
 <span class="l">10: </span>
 <span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> lockTokensToComplete <span class="o">=</span> <span class="k">new</span> ConcurrentStack&lt;Guid&gt;[numberOfReceivers];
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> tokensToComplete <span class="o">=</span> <span class="k">new</span> ConcurrentStack&lt;Guid&gt;[numberOfReceivers];
 <span class="c">// initialize the concurrent stacks</span>
 
-receiveClient<span class="n">1</span>.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, lockTokensToComplete[<span class="n">0</span>]);
+receiveClient<span class="n">1</span>.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, tokensToComplete[<span class="n">0</span>]);
 <span class="o">.</span><span class="o">.</span><span class="o">.</span>
-receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, lockTokensToComplete[N<span class="n">-1</span>]);
+receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, tokensToComplete[N<span class="n">-1</span>]);
 
-<span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message, ConcurrentStack&lt;Guid&gt; lockTokensToComplete) {
+<span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message, 
+    ConcurrentStack&lt;Guid&gt; tokensToComplete) {
+    
     <span class="c">// process message</span>
-    lockTokensToComplete.Push(message.LockToken);
+    tokensToComplete.Push(message.LockToken);
+
 }
 </code></pre></td></tr></table>
 </section>
@@ -285,12 +293,16 @@ receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&g
 <span class="l">12: </span>
 <span class="l">13: </span>
 <span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">for</span>(<span class="k">int</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfReceivers; i+<span class="o">+</span>) { 
     completionTasks[i] <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
 }
 
-<span class="k">static</span> <span class="k">async</span> Task BatchCompletionLoop(MessageReceiver receiver, ConcurrentStack&lt;Guid&gt; lockTokensToComplete) {
+<span class="k">static</span> <span class="k">async</span> Task BatchCompletionLoop(MessageReceiver receiver, 
+    ConcurrentStack&lt;Guid&gt; lockTokensToComplete) {
+
     <span class="k">while</span>(!token.IsCancellationRequested) {
         <span class="k">var</span> lockTokens <span class="o">=</span> <span class="k">new</span> Guid[<span class="n">100</span>];
         <span class="k">int</span> numberOfItems <span class="o">=</span> lockTokensToComplete.TryPopRange(lockTokens)
@@ -330,6 +342,10 @@ Completion is guaranteed to use the same receiver to complete
 <li>Autoscale up under heavy load</li>
 <li>Scale down under light load</li>
 <li>Minimise the contention on the underlying collections used</li>
+</ul>
+</section>
+<section >
+<ul>
 <li>Be completely asynchronous</li>
 <li>Implements a push based model from the producer and consumer perspective</li>
 <li>Respect the maximum batch sized defined by the client of the component or a predefined push interval</li>
@@ -396,10 +412,11 @@ https://www.planetgeek.ch/2017/01/17/introduction-to-the-multiproducerconcurrent
 <span class="l">15: </span>
 <span class="l">16: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">public</span> MultiProducerConcurrentCompletion(<span class="k">int</span> batchSize, TimeSpan pushInterval, <span class="k">int</span> maxConcurrency, <span class="k">int</span> numberOfSlots) {   
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">public</span> MultiProducerConcurrentCompletion(<span class="k">int</span> batchSize, TimeSpan pushInterval, 
+    <span class="k">int</span> maxConcurrency, <span class="k">int</span> numberOfSlots) {   
+    
     queues <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;TItem&gt;[numberOfSlots];
-    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfSlots; i+<span class="o">+</span>)
-    {
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfSlots; i+<span class="o">+</span>) {
         queues[i] <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;TItem&gt;();
     }
     
@@ -407,8 +424,7 @@ https://www.planetgeek.ch/2017/01/17/introduction-to-the-multiproducerconcurrent
     pushTasks <span class="o">=</span> <span class="k">new</span> List&lt;Task&gt;(maxNumberOfConcurrentOperationsPossible);
 
     itemListBuffer <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span>();
-    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> maxNumberOfConcurrentOperationsPossible; i+<span class="o">+</span>)
-    {
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> maxNumberOfConcurrentOperationsPossible; i+<span class="o">+</span>) {
         itemListBuffer.Enqueue(<span class="k">new</span> List&lt;TItem&gt;(batchSize));
     }
 }
@@ -416,7 +432,399 @@ https://www.planetgeek.ch/2017/01/17/introduction-to-the-multiproducerconcurrent
 <aside class="notes">
 The benefit of only allocating when needed is that the memory consumption only grows when it is needed. The downside of this approach is that under highly concurrent scenarios allocating structures in a safe and lock-free way can be tricky.<br/>
 https://www.planetgeek.ch/2017/01/19/multiproducerconcurrentconsumer-preallocate-and-reuse/<br/>
+</aside>
 </section>
+<section >
+<h3>Let's get started</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">public</span> <span class="k">void</span> Start(Func&lt;List&lt;TItem&gt;, <span class="k">int</span>, <span class="k">object</span>, CancellationToken, Task&gt; pump) 
+    <span class="o">=</span><span class="o">&gt;</span> Start(pump, <span class="k">null</span>);
+
+<span class="k">public</span> <span class="k">void</span> Start(Func&lt;List&lt;TItem&gt;, <span class="k">int</span>, <span class="k">object</span>, CancellationToken, Task&gt; pump, 
+    <span class="k">object</span> state) {
+    
+    <span class="k">if</span> (started)
+        <span class="k">throw</span> <span class="k">new</span> InvalidOperationException(<span class="s">"Already started"</span>);
+
+    tokenSource <span class="o">=</span> <span class="k">new</span> CancellationTokenSource();
+    timer <span class="o">=</span> Task.Run(TimerLoop);
+    <span class="k">this</span>.pump <span class="o">=</span> pump;
+    <span class="k">this</span>.state <span class="o">=</span> state;
+    started <span class="o">=</span> <span class="k">true</span>;
+}
+</code></pre></td></tr></table>
+<ul>
+<li>State based overload helps to avoid closure capturing</li>
+</ul>
+</section>
+<section >
+<h3>It's time to push</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">async</span> Task TimerLoop() {
+    <span class="k">var</span> token <span class="o">=</span> tokenSource.Token;
+    <span class="k">while</span> (!tokenSource.IsCancellationRequested) {
+        <span class="k">try</span> {
+            await Task.Delay(pushInterval, token);
+            await PushInBatches();
+        }
+        <span class="k">catch</span> (Exception) {
+            <span class="c">// intentionally ignored</span>
+        }
+    }
+}
+</code></pre></td></tr></table>
+<ul>
+<li>Achievement: Push items in batches based on the push interval</li>
+</ul>
+<aside class="notes">
+https://www.planetgeek.ch/2017/01/31/multiproducerconcurrentconsumer-start-it/<br/>
+</aside>
+</section>
+<section >
+<h3>Push it real good</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">public</span> <span class="k">void</span> Push(TItem item, <span class="k">int</span> slotNumber) {
+    <span class="k">if</span> (slotNumber <span class="o">&gt;</span><span class="o">=</span> numberOfSlots)
+        <span class="k">throw</span> <span class="k">new</span> ArgumentOutOfRangeException(<span class="o">.</span><span class="o">.</span><span class="o">.</span>);
+
+    queues[slotNumber].Enqueue(item);
+
+    <span class="k">var</span> incrementedCounter <span class="o">=</span> Interlocked.Increment(<span class="k">ref</span> numberOfPushedItems);
+
+    <span class="k">if</span> (incrementedCounter <span class="o">&gt;</span> batchSize) {
+        batchSizeReached.TrySetResult(<span class="k">true</span>);
+    }
+}
+</code></pre></td></tr></table>
+<ul>
+<li>Simple tradeoff: Global counter to reduce complexity</li>
+</ul>
+</section>
+<section >
+<h3>There is enough to push</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">async</span> Task TimerLoop() {
+    <span class="k">var</span> token <span class="o">=</span> tokenSource.Token;
+    <span class="k">while</span> (!tokenSource.IsCancellationRequested) {
+        <span class="k">try</span> {
+            await Task.WhenAny(Task.Delay(pushInterval, token), batchSizeReached.Task);
+            batchSizeReached.TrySetResult(<span class="k">true</span>);
+            batchSizeReached <span class="o">=</span> 
+                <span class="k">new</span> TaskCompletionSource&lt;<span class="k">bool</span>&gt;(TaskCreationOptions.RunContinuationsAsynchronously);
+            await PushInBatches();
+        }
+        <span class="k">catch</span> (Exception)
+        {
+            <span class="c">// intentionally ignored</span>
+        }
+    }
+}
+</code></pre></td></tr></table>
+<aside class="notes">
+https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br/>
+</aside>
+</section>
+<section >
+<h3>Push it in batches</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs">Task PushInBatches() {
+    <span class="k">if</span> (Interlocked.Read(<span class="k">ref</span> numberOfPushedItems) <span class="o">=</span><span class="o">=</span> <span class="n">0</span>) {
+        <span class="k">return</span> TaskEx.Completed;
+    }
+
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfSlots; i+<span class="o">+</span>) {
+        <span class="k">var</span> queue <span class="o">=</span> queues[i];
+
+        PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(queue, i, pushTasks);
+    }
+
+    <span class="k">return</span> Task.WhenAll(pushTasks).ContinueWith((t, s) <span class="o">=</span><span class="o">&gt;</span> {
+        <span class="k">var</span> tasks <span class="o">=</span> (List&lt;Task&gt;)s;
+        tasks.Clear();
+    }, pushTasks, TaskContinuationOptions.ExecuteSynchronously);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>Now it gets a little bit crazy</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+<span class="l">7: </span>
+<span class="l">8: </span>
+<span class="l">9: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">void</span> PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue&lt;TItem&gt; queue, 
+    <span class="k">int</span> currentSlotNumber, List&lt;Task&gt; tasks) {
+    <span class="k">int</span> numberOfItems;
+    <span class="k">var</span> concurrency <span class="o">=</span> <span class="n">1</span>;
+    <span class="k">do</span> {
+        <span class="c">// magic sauce</span>
+    }
+    <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+<span class="l">24: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">void</span> PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue&lt;TItem&gt; queue, 
+    <span class="k">int</span> currentSlotNumber, List&lt;Task&gt; tasks) {
+    <span class="k">int</span> numberOfItems;
+    <span class="k">var</span> concurrency <span class="o">=</span> <span class="n">1</span>;
+    <span class="k">do</span> {
+        numberOfItems <span class="o">=</span> <span class="n">0</span>;
+        List&lt;TItem&gt; items <span class="o">=</span> <span class="k">null</span>;
+        <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> batchSize; i+<span class="o">+</span>) {
+            <span class="k">if</span> (!queue.TryDequeue(<span class="k">out</span> <span class="k">var</span> item)) {
+                <span class="k">break</span>;
+            }
+
+            <span class="k">if</span> (items <span class="o">=</span><span class="o">=</span> <span class="k">null</span> <span class="o">&amp;</span><span class="o">&amp;</span> !itemListBuffer.TryDequeue(<span class="k">out</span> items)) {
+                items <span class="o">=</span> <span class="k">new</span> List&lt;TItem&gt;(batchSize);
+            }
+
+            items.Add(item);
+            numberOfItems+<span class="o">+</span>;
+        }
+
+        <span class="c">// more magic sauce</span>
+    }
+    <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">void</span> PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue&lt;TItem&gt; queue, 
+    <span class="k">int</span> currentSlotNumber, List&lt;Task&gt; tasks) {
+    <span class="k">int</span> numberOfItems;
+    <span class="k">var</span> concurrency <span class="o">=</span> <span class="n">1</span>;
+    <span class="k">do</span> {
+        <span class="c">// previous magic sauce</span>
+        
+        <span class="k">if</span> (numberOfItems <span class="o">&lt;</span><span class="o">=</span> <span class="n">0</span>) {
+            <span class="k">return</span>;
+        }
+
+        Interlocked.Add(<span class="k">ref</span> numberOfPushedItems, -numberOfItems);
+        concurrency+<span class="o">+</span>;
+        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
+        {
+            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span> (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
+            itemListAndListBuffer.Item<span class="n">1</span>.Clear();
+            itemListAndListBuffer.Item<span class="n">2</span>.Enqueue(itemListAndListBuffer.Item<span class="n">1</span>);
+        }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+        tasks.Add(task);
+    }
+    <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<h3>Give me the full picture you damn code cheater</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+<span class="l">24: </span>
+<span class="l">25: </span>
+<span class="l">26: </span>
+<span class="l">27: </span>
+<span class="l">28: </span>
+<span class="l">29: </span>
+<span class="l">30: </span>
+<span class="l">31: </span>
+<span class="l">32: </span>
+<span class="l">33: </span>
+<span class="l">34: </span>
+<span class="l">35: </span>
+<span class="l">36: </span>
+<span class="l">37: </span>
+<span class="l">38: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">void</span> PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue&lt;TItem&gt; queue, 
+    <span class="k">int</span> currentSlotNumber, List&lt;Task&gt; tasks) {
+    <span class="k">int</span> numberOfItems;
+    <span class="k">var</span> concurrency <span class="o">=</span> <span class="n">1</span>;
+    <span class="k">do</span> {
+        numberOfItems <span class="o">=</span> <span class="n">0</span>;
+        List&lt;TItem&gt; items <span class="o">=</span> <span class="k">null</span>;
+        <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> batchSize; i+<span class="o">+</span>) {
+            <span class="k">if</span> (!queue.TryDequeue(<span class="k">out</span> <span class="k">var</span> item)) {
+                <span class="k">break</span>;
+            }
+
+            <span class="k">if</span> (items <span class="o">=</span><span class="o">=</span> <span class="k">null</span> <span class="o">&amp;</span><span class="o">&amp;</span> !itemListBuffer.TryDequeue(<span class="k">out</span> items)) {
+                items <span class="o">=</span> <span class="k">new</span> List&lt;TItem&gt;(batchSize);
+            }
+
+            items.Add(item);
+            numberOfItems+<span class="o">+</span>;
+        }
+        
+        <span class="k">if</span> (numberOfItems <span class="o">&lt;</span><span class="o">=</span> <span class="n">0</span>) {
+            <span class="k">return</span>;
+        }
+
+        Interlocked.Add(<span class="k">ref</span> numberOfPushedItems, -numberOfItems);
+        concurrency+<span class="o">+</span>;
+        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
+        {
+            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span> (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
+            itemListAndListBuffer.Item<span class="n">1</span>.Clear();
+            itemListAndListBuffer.Item<span class="n">2</span>.Enqueue(itemListAndListBuffer.Item<span class="n">1</span>);
+        }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+        tasks.Add(task);
+    }
+    <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
+}
+
+' https:<span class="c">//www.planetgeek.ch/2017/03/07/multiproducerconcurrentconsumer-push-in-batches-up-to-concurrency-per-slot/</span>
+</code></pre></td></tr></table>
+</section>
+</section>
+<section >
+<h3>How on earth would we test this beast?</h3>
 </section>
 
 
