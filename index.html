@@ -61,6 +61,8 @@
 <section >
 <h3>Why am I telling you this?</h3>
 <p><img src="images/copy-paste.jpg" alt="Copy Paste" /></p>
+</section>
+<section >
 <blockquote>
 <p><strong>Stackoverflow Law</strong>: Good coders borrow, great coders steal. <a href="https://stackoverflow.blog/2020/05/20/good-coders-borrow-great-coders-steal/">The Internet</a></p>
 </blockquote>
@@ -824,7 +826,264 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 </section>
 </section>
 <section >
+<section >
 <h3>How on earth would we test this beast?</h3>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">public</span> <span class="k">async</span> Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+    <span class="k">var</span> receivedItems <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>[<span class="n">4</span>] {
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+    };
+
+    <span class="k">var</span> countDownEvent <span class="o">=</span> <span class="k">new</span> CountdownEvent(<span class="n">16</span>);
+
+    <span class="c">// choose insanely high push interval</span>
+    <span class="k">var</span> completion <span class="o">=</span> <span class="k">new</span> MultiProducerConcurrentCompletion&lt;<span class="k">int</span>&gt;(batchSize: <span class="n">100</span>, 
+        pushInterval: TimeSpan.FromDays(<span class="n">1</span>), maxConcurrency: <span class="n">4</span>, numberOfSlots: <span class="n">4</span>);
+
+    <span class="c">// Asserts</span>
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">public</span> <span class="k">async</span> Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+    <span class="c">// Previous arrange</span>
+
+    completion.Start((items, slot, state, token) <span class="o">=</span>&gt;s {
+        receivedItems[slot].Enqueue(<span class="k">new</span> List&lt;<span class="k">int</span>&gt;(items)); <span class="c">// take a copy</span>
+        <span class="k">if</span> (!countDownEvent.IsSet)
+        {
+            countDownEvent.Signal();
+        }
+        <span class="k">return</span> Task.FromResult(<span class="n">0</span>);
+    });
+
+    <span class="k">var</span> numberOfItems <span class="o">=</span> await PushConcurrentlyTwoThousandItemsInPackages
+        OfFiveHundredIntoFourSlots(completion);
+
+    <span class="c">// we wait for 16 counts and then complete midway</span>
+    await Task.Run(() <span class="o">=</span><span class="o">&gt;</span> countDownEvent.Wait(TimeSpan.FromSeconds(<span class="n">5</span>)));
+
+    await completion.Complete();
+
+    Assert.AreEqual(TriangularNumber(numberOfItems), Flatten(receivedItems).Sum(i <span class="o">=</span><span class="o">&gt;</span> i));
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+<span class="l">24: </span>
+<span class="l">25: </span>
+<span class="l">26: </span>
+<span class="l">27: </span>
+<span class="l">28: </span>
+<span class="l">29: </span>
+<span class="l">30: </span>
+<span class="l">31: </span>
+<span class="l">32: </span>
+<span class="l">33: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">public</span> <span class="k">async</span> Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+    <span class="k">var</span> receivedItems <span class="o">=</span> <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>[<span class="n">4</span>] {
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+        <span class="k">new</span> ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>(),
+    };
+
+    <span class="k">var</span> countDownEvent <span class="o">=</span> <span class="k">new</span> CountdownEvent(<span class="n">16</span>);
+
+    <span class="c">// choose insanely high push interval</span>
+    <span class="k">var</span> completion <span class="o">=</span> <span class="k">new</span> MultiProducerConcurrentCompletion&lt;<span class="k">int</span>&gt;(batchSize: <span class="n">100</span>, 
+        pushInterval: TimeSpan.FromDays(<span class="n">1</span>), maxConcurrency: <span class="n">4</span>, numberOfSlots: <span class="n">4</span>);
+
+    completion.Start((items, slot, state, token) <span class="o">=</span>&gt;s {
+        receivedItems[slot].Enqueue(<span class="k">new</span> List&lt;<span class="k">int</span>&gt;(items)); <span class="c">// take a copy</span>
+        <span class="k">if</span> (!countDownEvent.IsSet)
+        {
+            countDownEvent.Signal();
+        }
+        <span class="k">return</span> Task.FromResult(<span class="n">0</span>);
+    });
+
+    <span class="k">var</span> numberOfItems <span class="o">=</span> await PushConcurrentlyTwoThousandItemsInPackages
+        OfFiveHundredIntoFourSlots(completion);
+
+    <span class="c">// we wait for 16 counts and then complete midway</span>
+    await Task.Run(() <span class="o">=</span><span class="o">&gt;</span> countDownEvent.Wait(TimeSpan.FromSeconds(<span class="n">5</span>)));
+
+    await completion.Complete();
+
+    Assert.AreEqual(TriangularNumber(numberOfItems), Flatten(receivedItems).Sum(i <span class="o">=</span><span class="o">&gt;</span> i));
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">int</span> TriangularNumber(<span class="k">int</span> numberOfItems) {
+    <span class="k">return</span> numberOfItems*(numberOfItems <span class="o">+</span> <span class="n">1</span>)/<span class="n">2</span>;
+}
+</code></pre></td></tr></table>
+<p><img src="images/triangular.png" alt="Triangular Number" /></p>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp">IEnumerable&lt;<span class="k">int</span>&gt; Flatten(ConcurrentQueue&lt;List&lt;<span class="k">int</span>&gt;<span class="o">&gt;</span>[] captured) {
+    <span class="k">var</span> allCaptured <span class="o">=</span> <span class="k">new</span> List&lt;<span class="k">int</span>&gt;();
+    <span class="k">foreach</span> (<span class="k">var</span> queue <span class="k">in</span> captured) {
+        <span class="k">foreach</span> (<span class="k">var</span> list <span class="k">in</span> queue.ToArray())
+        {
+            allCaptured.AddRange(list);
+        }
+    }
+    <span class="k">return</span> allCaptured.OrderBy(i <span class="o">=</span><span class="o">&gt;</span> i);
+}
+</code></pre></td></tr></table>
+</section>
+<section >
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+<span class="l">24: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">static</span> <span class="k">async</span> Task&lt;<span class="k">int</span>&gt; PushConcurrentlyTwoThousandItemsInPackagesOf
+    FiveHundredIntoFourSlots(MultiProducerConcurrentCompletion&lt;<span class="k">int</span>&gt; completion)
+{
+    <span class="k">var</span> t<span class="n">1</span> <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> Parallel.For(<span class="n">1</span>, <span class="n">500</span>, i <span class="o">=</span><span class="o">&gt;</span> {
+        completion.Push(slotNumber: <span class="n">0</span>, item: i);
+    }));
+
+    <span class="k">var</span> t<span class="n">2</span> <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> Parallel.For(<span class="n">500</span>, <span class="n">1000</span>, i <span class="o">=</span><span class="o">&gt;</span> {
+        completion.Push(slotNumber: <span class="n">1</span>, item: i);
+    }));
+
+    <span class="k">var</span> t<span class="n">3</span> <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> Parallel.For(<span class="n">1000</span>, <span class="n">1500</span>, i <span class="o">=</span><span class="o">&gt;</span> {
+        completion.Push(slotNumber: <span class="n">2</span>, item: i);
+    }));
+
+    await Task.WhenAll(t<span class="n">1</span>, t<span class="n">2</span>, t<span class="n">3</span>);
+
+    <span class="k">var</span> numberOfItems <span class="o">=</span> <span class="n">2000</span>;
+    <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">1500</span>; i <span class="o">&lt;</span> numberOfItems <span class="o">+</span> <span class="n">1</span>; i+<span class="o">+</span>)
+    {
+        completion.Push(slotNumber: <span class="n">3</span>, item: i);
+    }
+    <span class="k">return</span> numberOfItems;
+}
+</code></pre></td></tr></table>
+</section>
+</section>
+<section >
+<h2>Recap</h2>
+<ul>
+<li>With the built-in tools we can already achieve quite nice structures for concurrent programming</li>
+<li>Today some of the inner workings could be replaced with <code>System.Threading.Channel</code></li>
+<li>I encourage you got go through the tests and the code or even build it yourself from scratch, you'll learn a ton</li>
+</ul>
+</section>
+<section >
+<h2>Links</h2>
+<ul>
+<li><a href="https://www.github.com/danielmarbach/ConcurrentDatastructures.Webinar">GitHub</a></li>
+<li><a href="https://www.twitter.com/danielmarbach">Twitter</a></li>
+<li><a href="https://danielmarbach.github.io/ConcurrentDataStructures.Webinar">Slides Online</a></li>
+</ul>
 </section>
 
 
