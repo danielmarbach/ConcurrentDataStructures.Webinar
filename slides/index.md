@@ -98,7 +98,7 @@
 
 > **Are all of the new concurrent collections lock-free?**: ConcurrentQueue<T> and ConcurrentStack<T> are completely lock-free in this way. They will never take a lock, but they may end up spinning and retrying an operation when faced with contention [Old Post](https://blogs.msdn.microsoft.com/pfxteam/2010/01/26/faq-are-all-of-the-new-concurrent-collections-lock-free/)
 
-' Of course the concurrent data structures are getting improved, still spinning and retrying is something that has to taken into account
+' Of course the concurrent data structures are getting improved, still spinning and retrying is something that has to be taken into account
 
 ---
 
