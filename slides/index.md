@@ -18,6 +18,8 @@
 
 ![Copy Paste](images/copy-paste.jpg)
 
+---
+
 > **Stackoverflow Law**: Good coders borrow, great coders steal. [The Internet](https://stackoverflow.blog/2020/05/20/good-coders-borrow-great-coders-steal/)
 
 ***
@@ -505,3 +507,152 @@
 ***
 
 ### How on earth would we test this beast?
+
+    [lang=csharp]
+    public async Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+        var receivedItems = new ConcurrentQueue<List<int>>[4] {
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+        };
+
+        var countDownEvent = new CountdownEvent(16);
+
+        // choose insanely high push interval
+        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, 
+            pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
+
+        // Asserts
+    }
+
+---
+
+    [lang=csharp]
+    public async Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+        // Previous arrange
+
+        completion.Start((items, slot, state, token) =>s {
+            receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
+            if (!countDownEvent.IsSet)
+            {
+                countDownEvent.Signal();
+            }
+            return Task.FromResult(0);
+        });
+
+        var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackages
+            OfFiveHundredIntoFourSlots(completion);
+
+        // we wait for 16 counts and then complete midway
+        await Task.Run(() => countDownEvent.Wait(TimeSpan.FromSeconds(5)));
+
+        await completion.Complete();
+
+        Assert.AreEqual(TriangularNumber(numberOfItems), Flatten(receivedItems).Sum(i => i));
+    }
+
+---
+
+
+    [lang=csharp]
+    public async Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
+        var receivedItems = new ConcurrentQueue<List<int>>[4] {
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+            new ConcurrentQueue<List<int>>(),
+        };
+
+        var countDownEvent = new CountdownEvent(16);
+
+        // choose insanely high push interval
+        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, 
+            pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
+
+        completion.Start((items, slot, state, token) =>s {
+            receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
+            if (!countDownEvent.IsSet)
+            {
+                countDownEvent.Signal();
+            }
+            return Task.FromResult(0);
+        });
+
+        var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackages
+            OfFiveHundredIntoFourSlots(completion);
+
+        // we wait for 16 counts and then complete midway
+        await Task.Run(() => countDownEvent.Wait(TimeSpan.FromSeconds(5)));
+
+        await completion.Complete();
+
+        Assert.AreEqual(TriangularNumber(numberOfItems), Flatten(receivedItems).Sum(i => i));
+    }
+
+---
+
+    [lang=csharp]
+    int TriangularNumber(int numberOfItems) {
+        return numberOfItems*(numberOfItems + 1)/2;
+    }
+
+![Triangular Number](images/triangular.png)
+
+---
+
+    [lang=csharp]
+    IEnumerable<int> Flatten(ConcurrentQueue<List<int>>[] captured) {
+        var allCaptured = new List<int>();
+        foreach (var queue in captured) {
+            foreach (var list in queue.ToArray())
+            {
+                allCaptured.AddRange(list);
+            }
+        }
+        return allCaptured.OrderBy(i => i);
+    }
+
+---
+
+    [lang=csharp]
+    static async Task<int> PushConcurrentlyTwoThousandItemsInPackagesOf
+        FiveHundredIntoFourSlots(MultiProducerConcurrentCompletion<int> completion)
+    {
+        var t1 = Task.Run(() => Parallel.For(1, 500, i => {
+            completion.Push(slotNumber: 0, item: i);
+        }));
+
+        var t2 = Task.Run(() => Parallel.For(500, 1000, i => {
+            completion.Push(slotNumber: 1, item: i);
+        }));
+
+        var t3 = Task.Run(() => Parallel.For(1000, 1500, i => {
+            completion.Push(slotNumber: 2, item: i);
+        }));
+
+        await Task.WhenAll(t1, t2, t3);
+
+        var numberOfItems = 2000;
+        for (var i = 1500; i < numberOfItems + 1; i++)
+        {
+            completion.Push(slotNumber: 3, item: i);
+        }
+        return numberOfItems;
+    }
+
+***
+
+## Recap
+
+- With the built-in tools we can already achieve quite nice structures for concurrent programming
+- Today some of the inner workings could be replaced with `System.Threading.Channel`
+- I encourage you got go through the tests and the code or even build it yourself from scratch, you'll learn a ton
+
+***
+
+## Links
+
+- [GitHub](https://www.github.com/danielmarbach/ConcurrentDatastructures.Webinar)
+- [Twitter](https://www.twitter.com/danielmarbach)
+- [Slides Online](https://danielmarbach.github.io/ConcurrentDataStructures.Webinar)
