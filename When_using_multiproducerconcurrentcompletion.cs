@@ -17,10 +17,10 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
         {
             var receivedItems = new ConcurrentQueue<List<int>>[4]
             {
-                new ConcurrentQueue<List<int>>(), 
-                new ConcurrentQueue<List<int>>(), 
-                new ConcurrentQueue<List<int>>(), 
-                new ConcurrentQueue<List<int>>(), 
+                new ConcurrentQueue<List<int>>(),
+                new ConcurrentQueue<List<int>>(),
+                new ConcurrentQueue<List<int>>(),
+                new ConcurrentQueue<List<int>>(),
             };
 
             var countDownEvent = new CountdownEvent(16);
@@ -30,14 +30,15 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
 
             var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackagesOfFiveHundredIntoFourSlots(completion);
 
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
                 if (!countDownEvent.IsSet)
                 {
                     countDownEvent.Signal();
                 }
-                return Task.FromResult(0);
             });
 
             await Task.Run(() => countDownEvent.Wait(TimeSpan.FromSeconds(5)));
@@ -66,14 +67,15 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
             // choose insanely high push interval
             var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
 
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
                 if (!countDownEvent.IsSet)
                 {
                     countDownEvent.Signal();
                 }
-                return Task.FromResult(0);
             });
 
             var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackagesOfFiveHundredIntoFourSlots(completion);
@@ -104,14 +106,15 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
 
             var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackagesOfFiveHundredIntoFourSlots(completion);
 
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
                 if (!countDownEvent.IsSet)
                 {
                     countDownEvent.Signal();
                 }
-                return Task.FromResult(0);
             });
 
             await Task.Run(() => countDownEvent.Wait(TimeSpan.FromSeconds(5)));
@@ -140,14 +143,15 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
             // choose insanely high batchSize to force push interval picking up all the content
             var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 10000, pushInterval: TimeSpan.FromMilliseconds(1), maxConcurrency: 4, numberOfSlots: 4);
 
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
                 if (!countDownEvent.IsSet)
                 {
                     countDownEvent.Signal();
                 }
-                return Task.FromResult(0);
             });
 
             var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackagesOfFiveHundredIntoFourSlots(completion);
@@ -181,11 +185,12 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
             await completion.Complete(drain: false);
 
             var countDownEvent = new CountdownEvent(1);
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 pushedItems[slot].Enqueue(new List<int>(items)); // take a copy
                 countDownEvent.Signal();
-                return Task.FromResult(0);
             });
 
             completion.Push(1, slotNumber: 1);
@@ -211,10 +216,11 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
             // choose insanely high batchSize and pushInterval to force the loop hanging
             var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 10000, pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
 
-            completion.Start((items, slot, state, token) =>
+            completion.Start(async (items, slot, state, token) =>
             {
+                await Task.Yield();
+
                 receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
-                return Task.FromResult(0);
             });
 
             var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackagesOfFiveHundredIntoFourSlots(completion);

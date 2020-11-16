@@ -533,13 +533,13 @@
     public async Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
         // Previous arrange
 
-        completion.Start((items, slot, state, token) =>s {
+        completion.Start(async (items, slot, state, token) =>s {
+            await Task.Yield();
             receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
             if (!countDownEvent.IsSet)
             {
                 countDownEvent.Signal();
             }
-            return Task.FromResult(0);
         });
 
         var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackages
@@ -571,13 +571,13 @@
         var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, 
             pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
 
-        completion.Start((items, slot, state, token) =>s {
+        completion.Start(async (items, slot, state, token) =>s {
+            await Task.Yield();            
             receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
             if (!countDownEvent.IsSet)
             {
                 countDownEvent.Signal();
             }
-            return Task.FromResult(0);
         });
 
         var numberOfItems = await PushConcurrentlyTwoThousandItemsInPackages
