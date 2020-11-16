@@ -26,10 +26,6 @@
 
 ### Receive/Complete messages
 
-- MessagingFactory = Dedicated TCP connection --> faaast!
-- Every `CompleteAsync` is a dedicated call to the cloud --> slooow!
-
-
     [lang=cs]
     var factory1 = await MessagingFactory.CreateAsync(address, settings);
     var factory2 = await MessagingFactory.CreateAsync(address, settings;
@@ -43,6 +39,9 @@
         // process message
         await receiver.CompleteAsync(message.LockToken)
     }
+
+- MessagingFactory = Dedicated TCP connection --> faaast!
+- Every `CompleteAsync` is a dedicated call to the cloud --> slooow!    
 
 ---
 
@@ -129,6 +128,8 @@
             await Task.Delay(TimeSpan.FromSeconds(5), token);
         }
     }
+
+---
 
 - Contention problem is even worse, multiple background completion operations are competing on the concurrent stack
 - Same `Task.Delay` without jitter causes a lot to wake up and potentially not succed, wasting a lot of resources
