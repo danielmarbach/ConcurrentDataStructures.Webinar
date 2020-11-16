@@ -71,10 +71,6 @@
 <section >
 <section >
 <h3>Receive/Complete messages</h3>
-<ul>
-<li>MessagingFactory = Dedicated TCP connection --&gt; faaast!</li>
-<li>Every <code>CompleteAsync</code> is a dedicated call to the cloud --&gt; slooow!</li>
-</ul>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
 <span class="l"> 2: </span>
 <span class="l"> 3: </span>
@@ -101,6 +97,10 @@ receiver<span class="n">2</span>.OnMessageAsync(msg <span class="o">=</span><spa
     await receiver.CompleteAsync(message.LockToken)
 }
 </code></pre></td></tr></table>
+<ul>
+<li>MessagingFactory = Dedicated TCP connection --&gt; faaast!</li>
+<li>Every <code>CompleteAsync</code> is a dedicated call to the cloud --&gt; slooow!</li>
+</ul>
 </section>
 <section >
 <h3>Can we do better?</h3>
@@ -180,7 +180,7 @@ So for example when we’d use 10 receivers with each a concurrency setting of 3
 <p><strong>Are all of the new concurrent collections lock-free?</strong>: ConcurrentQueue<T> and ConcurrentStack<T> are completely lock-free in this way. They will never take a lock, but they may end up spinning and retrying an operation when faced with contention <a href="https://blogs.msdn.microsoft.com/pfxteam/2010/01/26/faq-are-all-of-the-new-concurrent-collections-lock-free/">Old Post</a></p>
 </blockquote>
 <aside class="notes">
-Of course the concurrent data structures are getting improved, still spinning and retrying is something that has to taken into account<br/>
+Of course the concurrent data structures are getting improved, still spinning and retrying is something that has to be taken into account<br/>
 </aside>
 </section>
 <section >
@@ -226,6 +226,8 @@ Of course the concurrent data structures are getting improved, still spinning an
     }
 }
 </code></pre></td></tr></table>
+</section>
+<section >
 <ul>
 <li>Contention problem is even worse, multiple background completion operations are competing on the concurrent stack</li>
 <li>Same <code>Task.Delay</code> without jitter causes a lot to wake up and potentially not succed, wasting a lot of resources</li>
@@ -890,13 +892,13 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 <td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">public</span> <span class="k">async</span> Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
     <span class="c">// Previous arrange</span>
 
-    completion.Start((items, slot, state, token) <span class="o">=</span>&gt;s {
+    completion.Start(<span class="k">async</span> (items, slot, state, token) <span class="o">=</span>&gt;s {
+        await Task.Yield();
         receivedItems[slot].Enqueue(<span class="k">new</span> List&lt;<span class="k">int</span>&gt;(items)); <span class="c">// take a copy</span>
         <span class="k">if</span> (!countDownEvent.IsSet)
         {
             countDownEvent.Signal();
         }
-        <span class="k">return</span> Task.FromResult(<span class="n">0</span>);
     });
 
     <span class="k">var</span> numberOfItems <span class="o">=</span> await PushConcurrentlyTwoThousandItemsInPackages
@@ -960,13 +962,13 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
     <span class="k">var</span> completion <span class="o">=</span> <span class="k">new</span> MultiProducerConcurrentCompletion&lt;<span class="k">int</span>&gt;(batchSize: <span class="n">100</span>, 
         pushInterval: TimeSpan.FromDays(<span class="n">1</span>), maxConcurrency: <span class="n">4</span>, numberOfSlots: <span class="n">4</span>);
 
-    completion.Start((items, slot, state, token) <span class="o">=</span>&gt;s {
+    completion.Start(<span class="k">async</span> (items, slot, state, token) <span class="o">=</span>&gt;s {
+        await Task.Yield();            
         receivedItems[slot].Enqueue(<span class="k">new</span> List&lt;<span class="k">int</span>&gt;(items)); <span class="c">// take a copy</span>
         <span class="k">if</span> (!countDownEvent.IsSet)
         {
             countDownEvent.Signal();
         }
-        <span class="k">return</span> Task.FromResult(<span class="n">0</span>);
     });
 
     <span class="k">var</span> numberOfItems <span class="o">=</span> await PushConcurrentlyTwoThousandItemsInPackages
