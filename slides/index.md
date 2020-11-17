@@ -58,7 +58,7 @@
 
 ---
 
-### We need someonen to complete the tokens
+### We need someone to complete the tokens
 
     [lang=cs]
     var tokenSource = new CancellationTokenSource();
