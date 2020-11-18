@@ -521,6 +521,49 @@
 
 ***
 
+### How do we complete?
+
+    [lang=cs]
+    public async Task Complete(bool drain = true) {
+        if (started) {
+            tokenSource.Cancel();
+            await timer;
+
+            if (drain) {
+                do {
+                    await PushInBatches();
+                }
+                while (Interlocked.Read(ref numberOfPushedItems) > 0);
+            }
+
+            tokenSource.Dispose();
+        }
+        // more magic
+    }
+
+---
+
+    [lang=cs]
+    public async Task Complete(bool drain = true) {
+        // previous magic sauce
+
+        foreach (var queue in queues) {
+            if (queue.IsEmpty) {
+                continue;
+            }
+
+            while (queue.TryDequeue(out var _)) { }
+        }
+
+        numberOfPushedItems = 0;
+        started = false;
+        pump = null;
+        state = null;
+        tokenSource = null;
+    }
+
+***
+
 ### How on earth would we test this beast?
 
     [lang=csharp]
