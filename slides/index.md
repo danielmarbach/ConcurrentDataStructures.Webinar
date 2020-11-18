@@ -6,6 +6,13 @@
 
 ***
 
+### Concurrent data structures <br /> with examples in Azure Service Bus 
+
+[@danielmarbach](https://www.twitter.com/danielmarbach)<br />
+[www.planetgeek.ch](https://www.planetgeek.ch)
+
+---
+
 ### Introduction
 
 - The examples in this presentation use the [WindowsAzure.ServiceBus](https://www.nuget.org/packages/WindowsAzure.ServiceBus/) approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use [Microsoft.Azure.ServiceBus](https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/) or even better [Azure.Messaging.ServiceBus](https://www.nuget.org/packages/Azure.Messaging.ServiceBus) 
@@ -158,9 +165,11 @@
     var tokensToComplete = new ConcurrentStack<Guid>[numberOfReceivers];
     // initialize the concurrent stacks
     
-    receiveClient1.OnMessageAsync(message => ReceiveMessage(message, tokensToComplete[0]);
+    receiveClient1.OnMessageAsync(message => 
+        ReceiveMessage(message, tokensToComplete[0]);
     ...
-    receiveClientN.OnMessageAsync(message => ReceiveMessage(message, tokensToComplete[N-1]);
+    receiveClientN.OnMessageAsync(message => 
+        ReceiveMessage(message, tokensToComplete[N-1]);
     
     static async Task ReceiveMessage(BrokeredMessage message, 
         ConcurrentStack<Guid> tokensToComplete) {
@@ -176,7 +185,8 @@
 
     [lang=cs]
     for(int i = 0; i < numberOfReceivers; i++) { 
-        completionTasks[i] = Task.Run(() => BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
+        completionTasks[i] = Task.Run(() => 
+            BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
     }
   
     static async Task BatchCompletionLoop(MessageReceiver receiver, 
@@ -258,6 +268,7 @@
 - Allocate as much as you need upfront
 - Allocate on-demand when you need it
 
+---
 
     [lang=cs]
     public MultiProducerConcurrentCompletion(int batchSize, TimeSpan pushInterval, 
@@ -357,7 +368,8 @@
                 await Task.WhenAny(Task.Delay(pushInterval, token), batchSizeReached.Task);
                 batchSizeReached.TrySetResult(true);
                 batchSizeReached = 
-                    new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
                 await PushInBatches();
             }
             catch (Exception)
@@ -450,9 +462,11 @@
 
             Interlocked.Add(ref numberOfPushedItems, -numberOfItems);
             concurrency++;
-            var task = pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) =>
+            var task = pump(items, currentSlotNumber, state, tokenSource.Token)
+                .ContinueWith((t, taskState) =>
             {
-                var itemListAndListBuffer = (Tuple<List<TItem>, ConcurrentQueue<List<TItem>>>)taskState;
+                var itemListAndListBuffer = 
+                    (Tuple<List<TItem>, ConcurrentQueue<List<TItem>>>)taskState;
                 itemListAndListBuffer.Item1.Clear();
                 itemListAndListBuffer.Item2.Enqueue(itemListAndListBuffer.Item1);
             }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
