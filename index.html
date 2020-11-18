@@ -988,7 +988,7 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 <td class="snippet"><pre class="fssnip highlighted"><code lang="csharp"><span class="k">public</span> <span class="k">async</span> Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
     <span class="c">// Previous arrange</span>
 
-    completion.Start(<span class="k">async</span> (items, slot, state, token) <span class="o">=</span>&gt;s {
+    completion.Start(<span class="k">async</span> (items, slot, state, token) <span class="o">=</span><span class="o">&gt;</span> {
         await Task.Yield();
         receivedItems[slot].Enqueue(<span class="k">new</span> List&lt;<span class="k">int</span>&gt;(items)); <span class="c">// take a copy</span>
         <span class="k">if</span> (!countDownEvent.IsSet)
