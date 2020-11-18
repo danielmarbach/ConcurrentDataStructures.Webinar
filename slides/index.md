@@ -590,7 +590,7 @@
     public async Task Pushing_for_slots_after_start_works_when_batch_size_is_reached() {
         // Previous arrange
 
-        completion.Start(async (items, slot, state, token) =>s {
+        completion.Start(async (items, slot, state, token) => {
             await Task.Yield();
             receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
             if (!countDownEvent.IsSet)
