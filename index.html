@@ -51,6 +51,11 @@
         <div class="slides">
             <section >
 <section >
+<h3>Concurrent data structures <br /> with examples in Azure Service Bus</h3>
+<p><a href="https://www.twitter.com/danielmarbach">@danielmarbach</a><br />
+<a href="https://www.planetgeek.ch">www.planetgeek.ch</a></p>
+</section>
+<section >
 <h3>Introduction</h3>
 <ul>
 <li>The examples in this presentation use the <a href="https://www.nuget.org/packages/WindowsAzure.ServiceBus/">WindowsAzure.ServiceBus</a> approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use <a href="https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/">Microsoft.Azure.ServiceBus</a> or even better <a href="https://www.nuget.org/packages/Azure.Messaging.ServiceBus">Azure.Messaging.ServiceBus</a></li>
@@ -264,13 +269,17 @@ https://www.planetgeek.ch/2016/12/14/batch-completion-with-multiple-receivers-on
 <span class="l">12: </span>
 <span class="l">13: </span>
 <span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">var</span> tokensToComplete <span class="o">=</span> <span class="k">new</span> ConcurrentStack&lt;Guid&gt;[numberOfReceivers];
 <span class="c">// initialize the concurrent stacks</span>
 
-receiveClient<span class="n">1</span>.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, tokensToComplete[<span class="n">0</span>]);
+receiveClient<span class="n">1</span>.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> 
+    ReceiveMessage(message, tokensToComplete[<span class="n">0</span>]);
 <span class="o">.</span><span class="o">.</span><span class="o">.</span>
-receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> ReceiveMessage(message, tokensToComplete[N<span class="n">-1</span>]);
+receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&gt;</span> 
+    ReceiveMessage(message, tokensToComplete[N<span class="n">-1</span>]);
 
 <span class="k">static</span> <span class="k">async</span> Task ReceiveMessage(BrokeredMessage message, 
     ConcurrentStack&lt;Guid&gt; tokensToComplete) {
@@ -299,9 +308,11 @@ receiveClientN.OnMessageAsync(message <span class="o">=</span><span class="o">&g
 <span class="l">14: </span>
 <span class="l">15: </span>
 <span class="l">16: </span>
+<span class="l">17: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">for</span>(<span class="k">int</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfReceivers; i+<span class="o">+</span>) { 
-    completionTasks[i] <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
+    completionTasks[i] <span class="o">=</span> Task.Run(() <span class="o">=</span><span class="o">&gt;</span> 
+        BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
 }
 
 <span class="k">static</span> <span class="k">async</span> Task BatchCompletionLoop(MessageReceiver receiver, 
@@ -399,6 +410,8 @@ https://www.planetgeek.ch/2017/01/17/introduction-to-the-multiproducerconcurrent
 <li>Allocate as much as you need upfront</li>
 <li>Allocate on-demand when you need it</li>
 </ul>
+</section>
+<section >
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
 <span class="l"> 2: </span>
 <span class="l"> 3: </span>
@@ -561,6 +574,7 @@ https://www.planetgeek.ch/2017/01/31/multiproducerconcurrentconsumer-start-it/<b
 <span class="l">14: </span>
 <span class="l">15: </span>
 <span class="l">16: </span>
+<span class="l">17: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">async</span> Task TimerLoop() {
     <span class="k">var</span> token <span class="o">=</span> tokenSource.Token;
@@ -569,7 +583,8 @@ https://www.planetgeek.ch/2017/01/31/multiproducerconcurrentconsumer-start-it/<b
             await Task.WhenAny(Task.Delay(pushInterval, token), batchSizeReached.Task);
             batchSizeReached.TrySetResult(<span class="k">true</span>);
             batchSizeReached <span class="o">=</span> 
-                <span class="k">new</span> TaskCompletionSource&lt;<span class="k">bool</span>&gt;(TaskCreationOptions.RunContinuationsAsynchronously);
+                <span class="k">new</span> TaskCompletionSource&lt;<span class="k">bool</span>&gt;(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
             await PushInBatches();
         }
         <span class="k">catch</span> (Exception)
@@ -719,6 +734,8 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 <span class="l">21: </span>
 <span class="l">22: </span>
 <span class="l">23: </span>
+<span class="l">24: </span>
+<span class="l">25: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs"><span class="k">void</span> PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue&lt;TItem&gt; queue, 
     <span class="k">int</span> currentSlotNumber, List&lt;Task&gt; tasks) {
@@ -733,9 +750,11 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 
         Interlocked.Add(<span class="k">ref</span> numberOfPushedItems, -numberOfItems);
         concurrency+<span class="o">+</span>;
-        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
+        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token)
+            .ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
         {
-            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span> (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
+            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span> 
+                (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
             itemListAndListBuffer.Item<span class="n">1</span>.Clear();
             itemListAndListBuffer.Item<span class="n">2</span>.Enqueue(itemListAndListBuffer.Item<span class="n">1</span>);
         }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
