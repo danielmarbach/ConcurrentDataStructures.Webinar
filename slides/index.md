@@ -63,6 +63,8 @@
         lockTokensToComplete.Push(message.LockToken);
     }
 
+' Why `ConcurrentStack` instead of `ConcurrentQueue`? Honestly this code predates me. I guess because the stack contains a `TryPopRange` method
+
 ---
 
 ### We need someone to complete the tokens
