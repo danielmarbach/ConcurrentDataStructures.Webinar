@@ -1,12 +1,12 @@
-- title : Concurrent data structures with examples in Azure Service Bus 
-- description : Concurrent data structures with examples in Azure Service Bus 
+- title : Concurrent data structures with examples in Azure Service Bus
+- description : Concurrent data structures with examples in Azure Service Bus
 - author : Daniel Marbach
 - theme : night
 - transition : default
 
 ***
 
-### Concurrent data structures <br /> with examples in Azure Service Bus 
+### Concurrent data structures <br /> with examples in Azure Service Bus
 
 [@danielmarbach](https://www.twitter.com/danielmarbach)<br />
 [www.planetgeek.ch](https://www.planetgeek.ch)
@@ -15,7 +15,7 @@
 
 ### Introduction
 
-- The examples in this presentation use the [WindowsAzure.ServiceBus](https://www.nuget.org/packages/WindowsAzure.ServiceBus/) approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use [Microsoft.Azure.ServiceBus](https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/) or even better [Azure.Messaging.ServiceBus](https://www.nuget.org/packages/Azure.Messaging.ServiceBus) 
+- The examples in this presentation use the [WindowsAzure.ServiceBus](https://www.nuget.org/packages/WindowsAzure.ServiceBus/) approach to illustrate a problem. The package should no longer be used. If you plan to use Azure Service Bus use [Microsoft.Azure.ServiceBus](https://www.nuget.org/packages/Microsoft.Azure.ServiceBus/) or even better [Azure.Messaging.ServiceBus](https://www.nuget.org/packages/Azure.Messaging.ServiceBus)
 - For brevity and readability `ConfigureAwait(false)` has been left out and opionated braces placement has been used (You have been warned!)
 - If you see spelling mistakes, I accept Pull Requests ;)
 
@@ -48,7 +48,7 @@
     }
 
 - MessagingFactory = Dedicated TCP connection --> faaast!
-- Every `CompleteAsync` is a dedicated call to the cloud --> slooow!    
+- Every `CompleteAsync` is a dedicated call to the cloud --> slooow!
 
 ---
 
@@ -57,7 +57,7 @@
 
     [lang=cs]
     var lockTokensToComplete = new ConcurrentStack<Guid>();
-  
+
     static async Task ReceiveMessage(BrokeredMessage message) {
         // process message
         lockTokensToComplete.Push(message.LockToken);
@@ -70,7 +70,7 @@
     [lang=cs]
     var tokenSource = new CancellationTokenSource();
     var token = tokenSource.Token;
-    
+
     var batchCompletionTask = Task.Run(async () => {
         while(!token.IsCancellationRequested) {
             var lockTokens = new Guid[100];
@@ -82,16 +82,16 @@
         }
     });
 
-' Under small load, we complete lock tokens in in batches of one to maximum one hundred tokens. 
+' Under small load, we complete lock tokens in in batches of one to maximum one hundred tokens.
 ' If we receive only a limited number of messages, the loop might complete messages with their tokens one by one (for example when we receive a message every 6 seconds). But what happens when the load increases?
 ' When we’d received several hundred messages per seconds our randomly chosen “complete every one-hundredth messages” and then “sleep for five seconds” might turn out to be a suboptimal choice
 ' https://www.planetgeek.ch/2016/12/05/another-attempt-to-batch-complete-with-azure-service-bus/
 
---- 
+---
 
 ### Under concurrency, things might spin
 
-    [lang=cs] 
+    [lang=cs]
     static async Task ReceiveMessage(BrokeredMessage message) {
         // process message
         lockTokensToComplete.Push(message.LockToken);
@@ -99,7 +99,7 @@
 
 - `NumberOfReceivers` * `ConcurrencyPerReceiver` will push to the concurrent stack
 
-' So for example when we’d use 10 receivers with each a concurrency setting of 32 we’d be ending up pushing lock tokens to the concurrent stack from up to 320 simultaneous operations    
+' So for example when we’d use 10 receivers with each a concurrency setting of 32 we’d be ending up pushing lock tokens to the concurrent stack from up to 320 simultaneous operations
 
 ---
 
@@ -120,11 +120,11 @@
 
     [lang=cs]
     var completionTasks = new Task[numberOfReceivers];
-    
-    for(int i = 0; i < numberOfReceivers; i++) { 
+
+    for(int i = 0; i < numberOfReceivers; i++) {
         completionTasks[i] = Task.Run(() => BatchCompletionLoop());
     }
-    
+
     static async Task BatchCompletionLoop() {
         while(!token.IsCancellationRequested) {
             var lockTokens = new Guid[100];
@@ -164,16 +164,16 @@
     [lang=cs]
     var tokensToComplete = new ConcurrentStack<Guid>[numberOfReceivers];
     // initialize the concurrent stacks
-    
-    receiveClient1.OnMessageAsync(message => 
+
+    receiveClient1.OnMessageAsync(message =>
         ReceiveMessage(message, tokensToComplete[0]);
     ...
-    receiveClientN.OnMessageAsync(message => 
+    receiveClientN.OnMessageAsync(message =>
         ReceiveMessage(message, tokensToComplete[N-1]);
-    
-    static async Task ReceiveMessage(BrokeredMessage message, 
+
+    static async Task ReceiveMessage(BrokeredMessage message,
         ConcurrentStack<Guid> tokensToComplete) {
-        
+
         // process message
         tokensToComplete.Push(message.LockToken);
 
@@ -184,12 +184,12 @@
 ### ... and the completion
 
     [lang=cs]
-    for(int i = 0; i < numberOfReceivers; i++) { 
-        completionTasks[i] = Task.Run(() => 
+    for(int i = 0; i < numberOfReceivers; i++) {
+        completionTasks[i] = Task.Run(() =>
             BatchCompletionLoop(receivers[i], lockTokensToComplete[i]));
     }
-  
-    static async Task BatchCompletionLoop(MessageReceiver receiver, 
+
+    static async Task BatchCompletionLoop(MessageReceiver receiver,
         ConcurrentStack<Guid> lockTokensToComplete) {
 
         while(!token.IsCancellationRequested) {
@@ -247,15 +247,15 @@
     [lang=cs]
     class MultiProducerConcurrentConsumer<TItem> {
         public MultiProducerConcurrentConsumer(
-            int batchSize, TimeSpan pushInterval, 
+            int batchSize, TimeSpan pushInterval,
             int maxConcurrency, int numberOfSlots) { }
-    
+
         public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump) { }
-    
+
         public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump, object state) { }
-    
+
         public void Push(TItem item, int slotNumber) { }
-    
+
         public async Task Complete(bool drain = true) { }
     }
 
@@ -271,17 +271,17 @@
 ---
 
     [lang=cs]
-    public MultiProducerConcurrentCompletion(int batchSize, TimeSpan pushInterval, 
-        int maxConcurrency, int numberOfSlots) {   
-        
+    public MultiProducerConcurrentCompletion(int batchSize, TimeSpan pushInterval,
+        int maxConcurrency, int numberOfSlots) {
+
         queues = new ConcurrentQueue<TItem>[numberOfSlots];
         for (var i = 0; i < numberOfSlots; i++) {
             queues[i] = new ConcurrentQueue<TItem>();
         }
-        
+
         var maxNumberOfConcurrentOperationsPossible = numberOfSlots * maxConcurrency;
         pushTasks = new List<Task>(maxNumberOfConcurrentOperationsPossible);
-    
+
         itemListBuffer = new ConcurrentQueue<List<TItem>>();
         for (var i = 0; i < maxNumberOfConcurrentOperationsPossible; i++) {
             itemListBuffer.Enqueue(new List<TItem>(batchSize));
@@ -296,12 +296,12 @@
 ### Let's get started
 
     [lang=cs]
-    public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump) 
+    public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump)
         => Start(pump, null);
-    
-    public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump, 
+
+    public void Start(Func<List<TItem>, int, object, CancellationToken, Task> pump,
         object state) {
-        
+
         if (started)
             throw new InvalidOperationException("Already started");
 
@@ -332,7 +332,7 @@
         }
     }
 
-- Achievement: Push items in batches based on the push interval    
+- Achievement: Push items in batches based on the push interval
 
 ' https://www.planetgeek.ch/2017/01/31/multiproducerconcurrentconsumer-start-it/
 
@@ -367,7 +367,7 @@
             try {
                 await Task.WhenAny(Task.Delay(pushInterval, token), batchSizeReached.Task);
                 batchSizeReached.TrySetResult(true);
-                batchSizeReached = 
+                batchSizeReached =
                     new TaskCompletionSource<bool>(
                         TaskCreationOptions.RunContinuationsAsynchronously);
                 await PushInBatches();
@@ -408,7 +408,7 @@
 ### Now it gets a little bit crazy
 
     [lang=cs]
-    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue, 
+    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue,
         int currentSlotNumber, List<Task> tasks) {
         int numberOfItems;
         var concurrency = 1;
@@ -421,7 +421,7 @@
 ---
 
     [lang=cs]
-    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue, 
+    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue,
         int currentSlotNumber, List<Task> tasks) {
         int numberOfItems;
         var concurrency = 1;
@@ -449,13 +449,13 @@
 ---
 
     [lang=cs]
-    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue, 
+    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue,
         int currentSlotNumber, List<Task> tasks) {
         int numberOfItems;
         var concurrency = 1;
         do {
             // previous magic sauce
-            
+
             if (numberOfItems <= 0) {
                 return;
             }
@@ -465,7 +465,7 @@
             var task = pump(items, currentSlotNumber, state, tokenSource.Token)
                 .ContinueWith((t, taskState) =>
             {
-                var itemListAndListBuffer = 
+                var itemListAndListBuffer =
                     (Tuple<List<TItem>, ConcurrentQueue<List<TItem>>>)taskState;
                 itemListAndListBuffer.Item1.Clear();
                 itemListAndListBuffer.Item2.Enqueue(itemListAndListBuffer.Item1);
@@ -474,13 +474,13 @@
         }
         while (numberOfItems == batchSize && concurrency <= maxConcurrency);
     }
-    
+
 ---
 
 ### Give me the full picture you damn code cheater
 
     [lang=cs]
-    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue, 
+    void PushInBatchesUpToConcurrencyPerQueueForAGivenSlot(ConcurrentQueue<TItem> queue,
         int currentSlotNumber, List<Task> tasks) {
         int numberOfItems;
         var concurrency = 1;
@@ -499,7 +499,7 @@
                 items.Add(item);
                 numberOfItems++;
             }
-            
+
             if (numberOfItems <= 0) {
                 return;
             }
@@ -519,51 +519,6 @@
 
     ' https://www.planetgeek.ch/2017/03/07/multiproducerconcurrentconsumer-push-in-batches-up-to-concurrency-per-slot/
 
-***
-
-### How do we complete?
-
-    [lang=cs]
-    public async Task Complete(bool drain = true) {
-        if (started) {
-            tokenSource.Cancel();
-            await timer;
-
-            if (drain) {
-                do {
-                    await PushInBatches();
-                }
-                while (Interlocked.Read(ref numberOfPushedItems) > 0);
-            }
-
-            tokenSource.Dispose();
-        }
-        // more magic
-    }
-
----
-
-    [lang=cs]
-    public async Task Complete(bool drain = true) {
-        // previous magic sauce
-
-        foreach (var queue in queues) {
-            if (queue.IsEmpty) {
-                continue;
-            }
-
-            while (queue.TryDequeue(out var _)) { }
-        }
-
-        numberOfPushedItems = 0;
-        started = false;
-        pump = null;
-        state = null;
-        tokenSource = null;
-    }
-
-***
-
 ### How on earth would we test this beast?
 
     [lang=csharp]
@@ -578,7 +533,7 @@
         var countDownEvent = new CountdownEvent(16);
 
         // choose insanely high push interval
-        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, 
+        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100,
             pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
 
         // Asserts
@@ -625,11 +580,11 @@
         var countDownEvent = new CountdownEvent(16);
 
         // choose insanely high push interval
-        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100, 
+        var completion = new MultiProducerConcurrentCompletion<int>(batchSize: 100,
             pushInterval: TimeSpan.FromDays(1), maxConcurrency: 4, numberOfSlots: 4);
 
         completion.Start(async (items, slot, state, token) =>s {
-            await Task.Yield();            
+            await Task.Yield();
             receivedItems[slot].Enqueue(new List<int>(items)); // take a copy
             if (!countDownEvent.IsSet)
             {
