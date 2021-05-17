@@ -390,7 +390,7 @@
     [lang=cs]
     Task PushInBatches() {
         if (Interlocked.Read(ref numberOfPushedItems) == 0) {
-            return TaskEx.Completed;
+            return Task.CompletedTask;
         }
 
         for (var i = 0; i < numberOfSlots; i++) {
