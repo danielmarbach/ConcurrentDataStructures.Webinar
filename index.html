@@ -123,6 +123,9 @@ receiver<span class="n">2</span>.OnMessageAsync(msg <span class="o">=</span><spa
     lockTokensToComplete.Push(message.LockToken);
 }
 </code></pre></td></tr></table>
+<aside class="notes">
+Why `ConcurrentStack` instead of `ConcurrentQueue`? Honestly this code predates me. I guess because the stack contains a `TryPopRange` method<br/>
+</aside>
 </section>
 <section >
 <h3>We need someone to complete the tokens</h3>
@@ -619,7 +622,7 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="cs">Task PushInBatches() {
     <span class="k">if</span> (Interlocked.Read(<span class="k">ref</span> numberOfPushedItems) <span class="o">=</span><span class="o">=</span> <span class="n">0</span>) {
-        <span class="k">return</span> TaskEx.Completed;
+        <span class="k">return</span> Task.CompletedTask;
     }
 
     <span class="k">for</span> (<span class="k">var</span> i <span class="o">=</span> <span class="n">0</span>; i <span class="o">&lt;</span> numberOfSlots; i+<span class="o">+</span>) {
