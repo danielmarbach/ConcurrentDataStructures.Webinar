@@ -17,9 +17,9 @@ namespace NServiceBus.AzureServiceBus
     /// and available slots.
     /// </summary>
     /// <typeparam name="TItem">The item that is managed by the dispatcher.</typeparam>
-    class MultiProducerConcurrentCompletion<TItem>
+    class MultiProducerConcurrentCompletion_Channels<TItem>
     {
-        public MultiProducerConcurrentCompletion(int batchSize, TimeSpan pushInterval, int maxConcurrency, int numberOfSlots)
+        public MultiProducerConcurrentCompletion_Channels(int batchSize, TimeSpan pushInterval, int maxConcurrency, int numberOfSlots)
         {
             this.maxConcurrency = maxConcurrency;
             this.pushInterval = pushInterval;
@@ -179,7 +179,7 @@ namespace NServiceBus.AzureServiceBus
         {
             if (Interlocked.Read(ref numberOfPushedItems) == 0)
             {
-                return TaskEx.Completed;
+                return Task.CompletedTask;
             }
 
             for (var i = 0; i < numberOfSlots; i++)

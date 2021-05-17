@@ -131,9 +131,7 @@ namespace NServiceBus.AzureServiceBus
                     continue;
                 }
 
-                while (queue.TryDequeue(out var _))
-                {
-                }
+                queue.Clear();
             }
 
             numberOfPushedItems = 0;
@@ -171,7 +169,7 @@ namespace NServiceBus.AzureServiceBus
         {
             if (Interlocked.Read(ref numberOfPushedItems) == 0)
             {
-                return TaskEx.Completed;
+                return Task.CompletedTask;
             }
 
             for (var i = 0; i < numberOfSlots; i++)
