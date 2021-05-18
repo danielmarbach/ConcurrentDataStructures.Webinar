@@ -465,13 +465,13 @@
             Interlocked.Add(ref numberOfPushedItems, -numberOfItems);
             concurrency++;
             var task = pump(items, currentSlotNumber, state, tokenSource.Token)
-                .ContinueWith((t, taskState) =>
+                .ContinueWith(static (t, taskState) =>
             {
-                var itemListAndListBuffer =
-                    (Tuple<List<TItem>, ConcurrentQueue<List<TItem>>>)taskState;
-                itemListAndListBuffer.Item1.Clear();
-                itemListAndListBuffer.Item2.Enqueue(itemListAndListBuffer.Item1);
-            }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+                var (itemList, itemListBuffer) =
+                   (ValueTuple<List<TItem>, ConcurrentQueue<List<TItem>>>) taskState;
+                itemList.Clear();
+                itemListBuffer.Enqueue(itemList);
+            }, (items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
             tasks.Add(task);
         }
         while (numberOfItems == batchSize && concurrency <= maxConcurrency);
@@ -508,12 +508,12 @@
 
             Interlocked.Add(ref numberOfPushedItems, -numberOfItems);
             concurrency++;
-            var task = pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) =>
+            var task = pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith(static (t, taskState) =>
             {
-                var itemListAndListBuffer = (Tuple<List<TItem>, ConcurrentQueue<List<TItem>>>)taskState;
-                itemListAndListBuffer.Item1.Clear();
-                itemListAndListBuffer.Item2.Enqueue(itemListAndListBuffer.Item1);
-            }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+                var (itemList, itemListBuffer) = (ValueTuple<List<TItem>, ConcurrentQueue<List<TItem>>>) taskState;
+                itemList.Clear();
+                itemListBuffer.Enqueue(itemList);
+            }, (items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
             tasks.Add(task);
         }
         while (numberOfItems == batchSize && concurrency <= maxConcurrency);
