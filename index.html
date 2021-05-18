@@ -754,13 +754,13 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
         Interlocked.Add(<span class="k">ref</span> numberOfPushedItems, -numberOfItems);
         concurrency+<span class="o">+</span>;
         <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token)
-            .ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
+            .ContinueWith(<span class="k">static</span> (t, taskState) <span class="o">=</span><span class="o">&gt;</span>
         {
-            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span>
-                (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
-            itemListAndListBuffer.Item<span class="n">1</span>.Clear();
-            itemListAndListBuffer.Item<span class="n">2</span>.Enqueue(itemListAndListBuffer.Item<span class="n">1</span>);
-        }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+            <span class="k">var</span> (itemList, itemListBuffer) <span class="o">=</span>
+               (ValueTuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>) taskState;
+            itemList.Clear();
+            itemListBuffer.Enqueue(itemList);
+        }, (items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
         tasks.Add(task);
     }
     <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
@@ -834,12 +834,12 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
 
         Interlocked.Add(<span class="k">ref</span> numberOfPushedItems, -numberOfItems);
         concurrency+<span class="o">+</span>;
-        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith((t, taskState) <span class="o">=</span><span class="o">&gt;</span>
+        <span class="k">var</span> task <span class="o">=</span> pump(items, currentSlotNumber, state, tokenSource.Token).ContinueWith(<span class="k">static</span> (t, taskState) <span class="o">=</span><span class="o">&gt;</span>
         {
-            <span class="k">var</span> itemListAndListBuffer <span class="o">=</span> (Tuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>)taskState;
-            itemListAndListBuffer.Item<span class="n">1</span>.Clear();
-            itemListAndListBuffer.Item<span class="n">2</span>.Enqueue(itemListAndListBuffer.Item<span class="n">1</span>);
-        }, Tuple.Create(items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
+            <span class="k">var</span> (itemList, itemListBuffer) <span class="o">=</span> (ValueTuple&lt;List&lt;TItem&gt;, ConcurrentQueue&lt;List&lt;TItem&gt;<span class="o">&gt;</span><span class="o">&gt;</span>) taskState;
+            itemList.Clear();
+            itemListBuffer.Enqueue(itemList);
+        }, (items, itemListBuffer), TaskContinuationOptions.ExecuteSynchronously);
         tasks.Add(task);
     }
     <span class="k">while</span> (numberOfItems <span class="o">=</span><span class="o">=</span> batchSize <span class="o">&amp;</span><span class="o">&amp;</span> concurrency <span class="o">&lt;</span><span class="o">=</span> maxConcurrency);
@@ -1032,7 +1032,7 @@ https://www.planetgeek.ch/2017/02/01/multiproducerconcurrentconsumer-push-it/<br
             allCaptured.AddRange(list);
         }
     }
-    <span class="k">return</span> allCaptured.OrderBy(i <span class="o">=</span><span class="o">&gt;</span> i);
+    <span class="k">return</span> allCaptured;
 }
 </code></pre></td></tr></table>
 </section>
