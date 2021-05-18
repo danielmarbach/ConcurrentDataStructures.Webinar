@@ -625,7 +625,7 @@
                 allCaptured.AddRange(list);
             }
         }
-        return allCaptured.OrderBy(i => i);
+        return allCaptured;
     }
 
 ---

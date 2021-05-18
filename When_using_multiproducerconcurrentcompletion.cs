@@ -275,7 +275,7 @@ namespace NServiceBus.Azure.WindowsAzureServiceBus.Tests.Receiving
                     allCaptured.AddRange(list);
                 }
             }
-            return allCaptured.OrderBy(i => i);
+            return allCaptured;
         }
     }
 }
